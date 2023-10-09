@@ -8,6 +8,7 @@ class ElomusspiderSpider(scrapy.Spider):
     allowed_domains = ["elomus-theme.myshopify.com"]
     start_urls = ["https://elomus-theme.myshopify.com/collections"]
 
+    # main method for parsing all data
     def parse(self, response):
         shop_categories = response.css(".col-md-4 a::attr(href)").getall()
         for category in shop_categories:
@@ -17,8 +18,9 @@ class ElomusspiderSpider(scrapy.Spider):
             )
 
 
-
+    # method to parse specific category
     def parse_category(self, response):
+        # getting product_type if json creating is no available
         category_path = urlparse(response.url).path
         path_parts = category_path.split('/')
         product_type = path_parts[-1]
@@ -26,19 +28,22 @@ class ElomusspiderSpider(scrapy.Spider):
         # product_links = response.css(
         #     ".product-layout .item-inner a:not([href*='javascript:void(0);'])::attr(href)").getall()
 
+        # getting links for all products on the page
         product_links = response.css(
             ".images-container > a::attr(href)"
         ).getall()
 
         for link in product_links:
             detailed_url = urljoin(response.url, link)
+
+            #getting json data
             product_info = response.css(
                 f"a[href='{link}'] + .button-group .quickview::attr(data-productinfo)").get()
+
             yield scrapy.Request(
                 detailed_url,
                 callback=self.parse_product,
                 meta={
-                    "link": link,
                     "product_type": product_type,
                     "product_info": product_info,
                 }
@@ -53,6 +58,8 @@ class ElomusspiderSpider(scrapy.Spider):
 
 
     def parse_product(self, response):
+
+        #if json file is not available
         created_at = None
         published_at = None
         updated_at = None
@@ -75,6 +82,7 @@ class ElomusspiderSpider(scrapy.Spider):
         ).getall()
         variants = None
 
+        # if json is available
         if response.meta.get('product_info') is not None:
             product_info = json.loads(response.meta.get('product_info'))
 
@@ -92,7 +100,6 @@ class ElomusspiderSpider(scrapy.Spider):
             variants = [variant["id"] for variant in product_info.get('variants')]
 
         yield {
-            "link": response.meta.get("link"),
             "id": id_num,
             "title": title,
             "body_html": body_html,
